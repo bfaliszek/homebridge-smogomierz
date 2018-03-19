@@ -12,7 +12,7 @@ Project is based on [homebridge-airly](https://github.com/beniaminrychter/homebr
 1. Find your Smogmomierz IP Adress. Example: http://192.168.1.7/
 1. Update your configuration file like the example below.
 
-This plugin is returning data such as: PM1, PM2.5, PM10.
+This plugin is returning data such as: PM2.5, PM10.
 
 ## Configuration
 Example config.json
