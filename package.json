@@ -1,0 +1,33 @@
+{
+  "name": "homebridge-smogomierz",
+  "version": "1.0.0",
+  "description": "Homebridge plugin for showing air condition data from Smogomierz sensor",
+  "main": "index.js",
+  "keywords": [
+    "homebridge-plugin",
+    "homebridge",
+    "Smogomierz",
+    "air quality",
+    "pollution"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bfaliszek/homebridge-smogomierz.git"
+  },
+  "engines": {
+    "node": ">=0.12.0",
+    "homebridge": ">=0.2.0"
+  },
+  "author": "Błażej Faliszek",
+  "license": "GNU",
+  "bugs": {
+    "url": "https://github.com/bfaliszek/homebridge-smogomierz/issues"
+  },
+  "homepage": "https://github.com/bfaliszek/homebridge-smogomierz/#readme",
+  "dependencies": {
+    "request": "^2.83.0"
+  }
+}
