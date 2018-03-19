@@ -40,7 +40,7 @@ AirAccessory.prototype = {
     getAirData: function (callback) {
         var self = this;
         var aqi = 0;
-        var url = this.url + '/homebridge';
+        var url = this.url + 'homebridge';
 
 
         // Make request only every 10 minutes
