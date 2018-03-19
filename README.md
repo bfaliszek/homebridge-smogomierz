@@ -1,5 +1,5 @@
 # Homebridge-Smogomierz
-[![NPM Version](https://img.shields.io/npm/v/homebridge-airly.svg)](https://www.npmjs.com/package/homebridge-smogomierz)
+[![NPM Version](https://img.shields.io/npm/v/homebridge-smogomierz.svg)](https://www.npmjs.com/package/homebridge-smogomierz)
 
 **Homebridge plugin for showing air condition data from Smogomierz sensor.**
 
