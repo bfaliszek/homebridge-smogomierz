@@ -19,6 +19,7 @@ function AirAccessory(log, config) {
 
     // Name of Smogomierz
     this.name = config['name'];
+    //this.apikey = config['apikey'];
 
     // URL to Smogomierz sensor
     this.url = config['url'];
@@ -59,12 +60,15 @@ AirAccessory.prototype = {
                 if (!err && response.statusCode === 200) {
 
                     aqi = self.updateData(data, 'Fetch');
-                    callback(null);
+                    callback(null, self.transformAQI(aqi));
 
                     // If error
                 } else {
                     airService.setCharacteristic(Characteristic.StatusFault, 1);
                     self.log.error("Smogomierz doesn't work or Unknown Error.");
+					// DEBUG
+					// self.log.error(err);
+					// self.log.error(response.statusCode);
                     callback(err);
                 }
 
@@ -73,7 +77,7 @@ AirAccessory.prototype = {
             // Return cached data
         } else {
             aqi = self.updateData(self.cache, 'Cache');
-            callback(null);
+            callback(null, self.transformAQI(aqi));
         }
     },
 
@@ -85,11 +89,12 @@ AirAccessory.prototype = {
 
         airService.setCharacteristic(Characteristic.StatusFault, 0);
 		
-		airService.addCharacteristic(Characteristic.PM1Density, data.pm);
         airService.setCharacteristic(Characteristic.PM2_5Density, data.pm25);
         airService.setCharacteristic(Characteristic.PM10Density, data.pm10);
 
-        var aqi = 1;
+        // var aqi = data.airQualityIndex;
+		var aqi = 1;
+		
         this.log.info("[%s] Smogomierz air quality is: %s.", type, aqi.toString());
 
         this.cache = data;
@@ -106,7 +111,7 @@ AirAccessory.prototype = {
      * Return Air Quality Index
      * @param aqi
      * @returns {number}
-     *
+     */
     transformAQI: function (aqi) {
         if (!aqi) {
             return (0); // Error or unknown response
@@ -124,7 +129,7 @@ AirAccessory.prototype = {
             return (0); // Error or unknown response.
         }
     },
-	*/
+	
 
     identify: function (callback) {
         this.log("Identify requested!");
@@ -155,7 +160,6 @@ AirAccessory.prototype = {
             .on('get', this.getAirData.bind(this));
 
         airService.addCharacteristic(Characteristic.StatusFault);
-		airService.addCharacteristic(Characteristic.PM1Density);
         airService.addCharacteristic(Characteristic.PM2_5Density);
         airService.addCharacteristic(Characteristic.PM10Density);
         services.push(airService);
