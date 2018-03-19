@@ -92,8 +92,7 @@ AirAccessory.prototype = {
         airService.setCharacteristic(Characteristic.PM2_5Density, data.pm25);
         airService.setCharacteristic(Characteristic.PM10Density, data.pm10);
 
-        // var aqi = data.airQualityIndex;
-		var aqi = 1;
+         var aqi = data.pm25;
 		
         this.log.info("[%s] Smogomierz air quality is: %s.", type, aqi.toString());
 
@@ -112,18 +111,19 @@ AirAccessory.prototype = {
      * @param aqi
      * @returns {number}
      */
+	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index 
     transformAQI: function (aqi) {
         if (!aqi) {
             return (0); // Error or unknown response
-        } else if (aqi <= 25) {
+        } else if (aqi <= 10) {
             return (1); // Return EXCELLENT
-        } else if (aqi > 25 && aqi <= 50) {
+        } else if (aqi > 10 && aqi <= 20) {
             return (2); // Return GOOD
-        } else if (aqi > 50 && aqi <= 75) {
+        } else if (aqi > 20 && aqi <= 25) {
             return (3); // Return FAIR
-        } else if (aqi > 75 && aqi <= 100) {
+        } else if (aqi > 25 && aqi <= 50) {
             return (4); // Return INFERIOR
-        } else if (aqi > 100) {
+        } else if (aqi > 50) {
             return (5); // Return POOR (Homekit only goes to cat 5, so combined the last two AQI cats of Very Unhealty and Hazardous.
         } else {
             return (0); // Error or unknown response.
