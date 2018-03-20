@@ -10,7 +10,6 @@ module.exports = function (homebridge) {
     homebridge.registerAccessory("homebridge-smogomierz", "Smogomierz", AirAccessory);
 };
 
-
 /**
  * Smogomierz Accessory
  */
@@ -19,7 +18,6 @@ function AirAccessory(log, config) {
 
     // Name of Smogomierz
     this.name = config['name'];
-    //this.apikey = config['apikey'];
 
     // URL to Smogomierz sensor
     this.url = config['url'];
@@ -40,9 +38,8 @@ AirAccessory.prototype = {
      */
     getAirData: function (callback) {
         var self = this;
-        var aqi = 0;
-        var url = this.url + 'homebridge';
-
+        var PM25 = 0;
+        var url = this.url + 'api';
 
         // Make request only every 10 minutes
         if (this.lastupdate === 0 || this.lastupdate + 600 < (new Date().getTime() / 1000) || this.cache === undefined) {
@@ -50,25 +47,17 @@ AirAccessory.prototype = {
             request({
                 url: url,
                 json: true,
-                /*	For future API KEY
-				headers: {
-                    'apikey': self.apikey
-                }*/
             }, function (err, response, data) {
 
                 // If no errors
                 if (!err && response.statusCode === 200) {
+                    PM25 = self.updateData(data, 'Fetch');
+                    callback(null, self.transformPM25(PM25));
 
-                    aqi = self.updateData(data, 'Fetch');
-                    callback(null, self.transformAQI(aqi));
-
-                    // If error
+                // If error
                 } else {
                     airService.setCharacteristic(Characteristic.StatusFault, 1);
                     self.log.error("Smogomierz doesn't work or Unknown Error.");
-					// DEBUG
-					// self.log.error(err);
-					// self.log.error(response.statusCode);
                     callback(err);
                 }
 
@@ -76,11 +65,10 @@ AirAccessory.prototype = {
 
             // Return cached data
         } else {
-            aqi = self.updateData(self.cache, 'Cache');
-            callback(null, self.transformAQI(aqi));
+            PM25 = self.updateData(self.cache, 'Cache');
+            callback(null, self.transformPM25(PM25));
         }
     },
-
 
     /**
      * Update data
@@ -92,9 +80,9 @@ AirAccessory.prototype = {
         airService.setCharacteristic(Characteristic.PM2_5Density, data.pm25);
         airService.setCharacteristic(Characteristic.PM10Density, data.pm10);
 
-         var aqi = data.pm25;
+         var PM25 = data.pm25;
 		
-        this.log.info("[%s] Smogomierz air quality is: %s.", type, aqi.toString());
+        this.log.info("[%s] PM2.5: %s.", type, PM25.toString());
 
         this.cache = data;
 
@@ -102,40 +90,32 @@ AirAccessory.prototype = {
             this.lastupdate = new Date().getTime() / 1000;
         }
 
-        return aqi;
+        return PM25;
     },
 
-	
-    /** For futer AQI support
-     * Return Air Quality Index
-     * @param aqi
-     * @returns {number}
-     */
 	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index 
-    transformAQI: function (aqi) {
-        if (!aqi) {
+    transformPM25: function (PM25) {
+        if (!PM25) {
             return (0); // Error or unknown response
-        } else if (aqi <= 10) {
+        } else if (PM25 <= 10) {
             return (1); // Return EXCELLENT
-        } else if (aqi > 10 && aqi <= 20) {
+        } else if (PM25 > 10 && PM25 <= 20) {
             return (2); // Return GOOD
-        } else if (aqi > 20 && aqi <= 25) {
+        } else if (PM25 > 20 && PM25 <= 25) {
             return (3); // Return FAIR
-        } else if (aqi > 25 && aqi <= 50) {
+        } else if (PM25 > 25 && PM25 <= 50) {
             return (4); // Return INFERIOR
-        } else if (aqi > 50) {
-            return (5); // Return POOR (Homekit only goes to cat 5, so combined the last two AQI cats of Very Unhealty and Hazardous.
+        } else if (PM25 > 50) {
+            return (5); // Return POOR (Homekit only goes to cat 5).
         } else {
             return (0); // Error or unknown response.
         }
     },
-	
 
     identify: function (callback) {
         this.log("Identify requested!");
         callback(); // success
     },
-
 
     getServices: function () {
         var services = [];
@@ -164,8 +144,6 @@ AirAccessory.prototype = {
         airService.addCharacteristic(Characteristic.PM10Density);
         services.push(airService);
 
-
         return services;
     }
 };
-
