@@ -30,5 +30,5 @@ Example config.json
 ## Config file
 Fields:
 - `accessory` must be "Smogomierz" (required).
-- `url` adress of your Smogomierz sensor (required). Remember about '/' on the end!
+- `url` adress of your Smogomierz sensor (required). Remember about 'http://' at the beginning and '/' on the end!
 - `name` Is the name of accessory, you can change it! (required).
