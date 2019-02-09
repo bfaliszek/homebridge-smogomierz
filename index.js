@@ -7,6 +7,7 @@ var request = require('request');
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
+	
     homebridge.registerAccessory("homebridge-smogomierz", "Smogomierz", AirAccessory);
 };
 
@@ -39,6 +40,7 @@ AirAccessory.prototype = {
     getAirData: function (callback) {
         var self = this;
         var PM25 = 0;
+		
         var url = this.url + 'api';
 
         // Make request only every 10 minutes
@@ -76,12 +78,16 @@ AirAccessory.prototype = {
     updateData: function (data, type) {
 
         airService.setCharacteristic(Characteristic.StatusFault, 0);
-		
-        airService.setCharacteristic(Characteristic.PM2_5Density, data.pm25);
-        airService.setCharacteristic(Characteristic.PM10Density, data.pm10);
+
+        airService.setCharacteristic(Characteristic.PM2_5Density, roundInt(data.pm25));
+        airService.setCharacteristic(Characteristic.PM10Density, roundInt(data.pm10));
+
+        temperatureService.setCharacteristic(Characteristic.CurrentTemperature, roundInt(data.temperature));
+        temperatureService.setCharacteristic(Characteristic.AtmosphericPressureLevel, roundInt(data.pressure));
+        humidityService.setCharacteristic(Characteristic.CurrentRelativeHumidity, roundInt(data.humidity));
 
          var PM25 = data.pm25;
-		
+
         this.log.info("[%s] PM2.5: %s.", type, PM25.toString());
 
         this.cache = data;
@@ -93,7 +99,7 @@ AirAccessory.prototype = {
         return PM25;
     },
 
-	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index 
+	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index
     transformPM25: function (PM25) {
         if (!PM25) {
             return (0); // Error or unknown response
@@ -142,6 +148,9 @@ AirAccessory.prototype = {
         airService.addCharacteristic(Characteristic.StatusFault);
         airService.addCharacteristic(Characteristic.PM2_5Density);
         airService.addCharacteristic(Characteristic.PM10Density);
+        airService.addCharacteristic(Characteristic.CurrentTemperature);
+        airService.addCharacteristic(Characteristic.AtmosphericPressureLevel);
+        airService.addCharacteristic(Characteristic.CurrentRelativeHumidity);
         services.push(airService);
 
         return services;
