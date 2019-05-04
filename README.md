@@ -12,7 +12,7 @@ Project is based on [homebridge-airly](https://github.com/beniaminrychter/homebr
 1. Find your Smogmomierz IP Adress. Example: http://192.168.1.7/
 1. Update your configuration file like the example below.
 
-This plugin is returning data such as: PM2.5, PM10.
+This plugin is returning data such as: PM2.5, PM10, Temperature, Humidity.
 
 ## Configuration
 Example config.json
@@ -21,8 +21,14 @@ Example config.json
 "accessories": [
     {
           "accessory": "Smogomierz",
+          "name": "Smogomierz",
           "url": "SMOGOMIERZ_IP_ADRESS",
-          "name": "Smogomierz Air Quality"
+          "cacheExpiryTime": 10,
+          "servicesNames": {
+            "airQuality": "Air Quality",
+            "temperature": "Temperature",
+            "humidity": "Humidity"
+          }
     }
 ]
 ```
@@ -30,5 +36,8 @@ Example config.json
 ## Config file
 Fields:
 - `accessory` must be "Smogomierz" (required).
-- `url` adress of your Smogomierz sensor (required). Remember about 'http://' at the beginning and '/' on the end!
 - `name` Is the name of accessory, you can change it! (required).
+- `url` adress of your Smogomierz sensor (required). Remember about 'http://' at the beginning and '/' on the end!
+- `cacheExpiryTime` time (in minutes) after which cache will be updated
+- `servicesNames` display names of services (will be visible on the tiles in Home app)
+
