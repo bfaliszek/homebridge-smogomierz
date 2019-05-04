@@ -25,9 +25,9 @@ class SmogomierzRepository {
         this.log = log
 
         // URL to Smogomierz sensor
-        this._url = config['url'];
-        if (!this._url) throw new Error("Smogomierz - you must provide a URL adress.");
-        this.log.info("URL set: " + this._url)
+        this.url = config['url'];
+        if (!this.url) throw new Error("Smogomierz - you must provide a URL adress.");
+        this.log.info("URL set: " + this.url)
 
         this.lastupdate = 0;
         this.cache = undefined;
@@ -51,7 +51,7 @@ class SmogomierzRepository {
      */
     getData(callback) {
         var self = this;
-        var url = this._url + 'api';
+        var url = this.url + 'api';
 
         if (self.isFetching) {
             self.callbackQueue.push(callback)
