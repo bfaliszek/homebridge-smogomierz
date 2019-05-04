@@ -26,7 +26,7 @@ Example config.json
           "cacheExpiryTime": 10,
           "servicesNames": {
             "airQuality": "Air Quality",
-            "temperaturex": "Temperature",
+            "temperature": "Temperature",
             "humidity": "Humidity"
           }
     }
