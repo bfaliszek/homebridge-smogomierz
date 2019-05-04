@@ -22,19 +22,28 @@ const DataType = {
 
 class SmogomierzRepository {
     constructor(log, config) {
-        this._cacheExpiryTime = config['cacheExpiryTime'] || 10
-        this._isFetching = false
-        this._callbackQueue = []
-
         this.log = log
 
         // URL to Smogomierz sensor
-        this.url = config['url'];
-
-        if (!this.url) throw new Error("Smogomierz - you must provide a URL adress.");
+        this._url = config['url'];
+        if (!this._url) throw new Error("Smogomierz - you must provide a URL adress.");
+        this.log.info("URL set: " + this._url)
 
         this.lastupdate = 0;
         this.cache = undefined;
+        this.isFetching = false
+        this.callbackQueue = []
+
+        this.cacheExpiryTime = Number(config['cacheExpiryTime'])
+        if (isNaN(this.cacheExpiryTime)) {
+            this.cacheExpiryTime = 10
+            this.log.error("Wrong config 'cacheExpiryTime' parameter. Set to default.")
+        } else if (this.cacheExpiryTime < 1) {
+            this.cacheExpiryTime = 10
+            this.log.error("'cacheExpiryTime' lower then 1. Set to default.")
+        }
+
+        this.log.info("cacheExpiryTime set: " + this.cacheExpiryTime.toString())
     }
 
     /**
@@ -42,24 +51,24 @@ class SmogomierzRepository {
      */
     getData(callback) {
         var self = this;
-        var url = this.url + 'api';
+        var url = this._url + 'api';
 
-        if (self._isFetching) {
-            self._callbackQueue.push(callback)
+        if (self.isFetching) {
+            self.callbackQueue.push(callback)
             return
         }
 
         if (this._shouldUpdate()) {
-            self._isFetching = true
+            self.isFetching = true
 
             request({
                 url: url,
                 json: true,
             }, function (err, response, data) {
-                self._isFetching = false
+                self.isFetching = false
 
-                let callbackQueue = self._callbackQueue
-                self._callbackQueue = []
+                let callbackQueue = self.callbackQueue
+                self.callbackQueue = []
 
                 // If no errors
                 if (!err && response.statusCode === 200) {
@@ -89,7 +98,7 @@ class SmogomierzRepository {
     }
 
     _shouldUpdate() {
-        let intervalBetweenUpdates = this._cacheExpiryTime * 60
+        let intervalBetweenUpdates = this.cacheExpiryTime * 60
         return this.lastupdate === 0 ||
                 this.lastupdate + intervalBetweenUpdates < (new Date().getTime() / 1000) ||
                 this.cache === undefined
@@ -100,9 +109,8 @@ class SmogomierzRepository {
  * Smogomierz Accessory
  */
 function SmogomierzSensor(log, config) {
-    this._names = config['servicesNames'] || {}
-
     this.log = log;
+    this.servicesNames = config['servicesNames'] || {}
     this.smogomierzRepo = new SmogomierzRepository(log, config)
 
     this.log.info("Smogomierz setuped");
@@ -180,7 +188,7 @@ SmogomierzSensor.prototype = {
         /**
          * airQualitySensorService
          */
-        let airQualityName = this._names['airQuality'] || "Air Quality"
+        let airQualityName = this.servicesNames['airQuality'] || "Air Quality"
         airQualitySensorService = new Service.AirQualitySensor(airQualityName);
 
         airQualitySensorService
@@ -200,7 +208,7 @@ SmogomierzSensor.prototype = {
         /**
          * temperatureSensorService
          */
-        let temperatureName = this._names['temperature'] || "Temperature"
+        let temperatureName = this.servicesNames['temperature'] || "Temperature"
         temperatureSensorService = new Service.TemperatureSensor(temperatureName)
 
         temperatureSensorService
@@ -212,7 +220,7 @@ SmogomierzSensor.prototype = {
         /**
          * humiditySensorService
          */
-        let humidityName = this._names['humidity'] || "Humidity"
+        let humidityName = this.servicesNames['humidity'] || "Humidity"
         humiditySensorService = new Service.HumiditySensor(humidityName)
 
         humiditySensorService
