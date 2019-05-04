@@ -22,6 +22,7 @@ const DataType = {
 
 class SmogomierzRepository {
     constructor(log, config) {
+        this._cacheExpiryTime = config['cacheExpiryTime'] || 10
         this._isFetching = false
         this._callbackQueue = []
 
@@ -88,7 +89,7 @@ class SmogomierzRepository {
     }
 
     _shouldUpdate() {
-        let intervalBetweenUpdates = 10 * 60
+        let intervalBetweenUpdates = this._cacheExpiryTime * 60
         return this.lastupdate === 0 ||
                 this.lastupdate + intervalBetweenUpdates < (new Date().getTime() / 1000) ||
                 this.cache === undefined
@@ -99,6 +100,8 @@ class SmogomierzRepository {
  * Smogomierz Accessory
  */
 function SmogomierzSensor(log, config) {
+    this._names = config['servicesNames'] || {}
+
     this.log = log;
     this.smogomierzRepo = new SmogomierzRepository(log, config)
 
@@ -177,7 +180,8 @@ SmogomierzSensor.prototype = {
         /**
          * airQualitySensorService
          */
-        airQualitySensorService = new Service.AirQualitySensor("Air Quality");
+        let airQualityName = this._names['airQuality'] || "Air Quality"
+        airQualitySensorService = new Service.AirQualitySensor(airQualityName);
 
         airQualitySensorService
             .getCharacteristic(Characteristic.AirQuality)
@@ -196,7 +200,8 @@ SmogomierzSensor.prototype = {
         /**
          * temperatureSensorService
          */
-        temperatureSensorService = new Service.TemperatureSensor("Temperature")
+        let temperatureName = this._names['temperature'] || "Temperature"
+        temperatureSensorService = new Service.TemperatureSensor(temperatureName)
 
         temperatureSensorService
             .getCharacteristic(Characteristic.CurrentTemperature)
@@ -207,7 +212,8 @@ SmogomierzSensor.prototype = {
         /**
          * humiditySensorService
          */
-        humiditySensorService = new Service.HumiditySensor("Humidity")
+        let humidityName = this._names['humidity'] || "Humidity"
+        humiditySensorService = new Service.HumiditySensor(humidityName)
 
         humiditySensorService
             .getCharacteristic(Characteristic.CurrentRelativeHumidity)
