@@ -1,115 +1,170 @@
 "use strict";
 
 var Service, Characteristic;
-var airService;
+var airQualitySensorService;
+var temperatureSensorService;
+var humiditySensorService;
 var request = require('request');
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
-    homebridge.registerAccessory("homebridge-smogomierz", "Smogomierz", AirAccessory);
+    homebridge.registerAccessory("homebridge-smogomierz", "Smogomierz", SmogomierzSensor);
 };
 
-/**
- * Smogomierz Accessory
- */
-function AirAccessory(log, config) {
-    this.log = log;
+const DataType = {
+    PM2_5: 'pm2_5Type',
+    PM10: 'pm10Type',
+    AIRQUALITY: 'airQualityType',
+    TEMPERATURE: 'temperatureType',
+    HUMIDITY: 'humidityType'
+};
 
-    // Name of Smogomierz
-    this.name = config['name'];
+class SmogomierzRepository {
+    constructor(log, config) {
+        this.log = log
 
-    // URL to Smogomierz sensor
-    this.url = config['url'];
+        // URL to Smogomierz sensor
+        this.url = config['url'];
+        if (!this.url) throw new Error("Smogomierz - you must provide a URL adress.");
+        this.log.info("URL set: " + this.url)
 
-    if (!this.url) throw new Error("Smogomierz - you must provide a URL adress.");
+        this.lastupdate = 0;
+        this.cache = undefined;
+        this.isFetching = false
+        this.callbackQueue = []
 
-    this.lastupdate = 0;
-    this.cache = undefined;
+        this.cacheExpiryTime = Number(config['cacheExpiryTime'])
+        if (isNaN(this.cacheExpiryTime)) {
+            this.cacheExpiryTime = 10
+            this.log.error("Wrong config 'cacheExpiryTime' parameter. Set to default.")
+        } else if (this.cacheExpiryTime < 1) {
+            this.cacheExpiryTime = 10
+            this.log.error("'cacheExpiryTime' lower then 1. Set to default.")
+        }
 
-    this.log.info("Smogomierz is working");
-}
-
-
-AirAccessory.prototype = {
+        this.log.info("cacheExpiryTime set: " + this.cacheExpiryTime.toString())
+    }
 
     /**
      * Get all Smogomierz data from ESP8266
      */
-    getAirData: function (callback) {
+    getData(callback) {
         var self = this;
-        var PM25 = 0;
         var url = this.url + 'api';
 
-        // Make request only every 10 minutes
-        if (this.lastupdate === 0 || this.lastupdate + 600 < (new Date().getTime() / 1000) || this.cache === undefined) {
+        if (self.isFetching) {
+            self.callbackQueue.push(callback)
+            return
+        }
+
+        if (this._shouldUpdate()) {
+            self.isFetching = true
 
             request({
                 url: url,
                 json: true,
             }, function (err, response, data) {
+                self.isFetching = false
+
+                let callbackQueue = self.callbackQueue
+                self.callbackQueue = []
 
                 // If no errors
                 if (!err && response.statusCode === 200) {
-                    PM25 = self.updateData(data, 'Fetch');
-                    callback(null, self.transformPM25(PM25));
+                    self.cache = data
+                    self.lastupdate = new Date().getTime() / 1000;
+                    callback(null, data, 'Fetch');
+
+                    for (let c of callbackQueue) {
+                        c(null, data, 'Cache');
+                    }
 
                 // If error
                 } else {
-                    airService.setCharacteristic(Characteristic.StatusFault, 1);
                     self.log.error("Smogomierz doesn't work or Unknown Error.");
-                    callback(err);
-                }
+                    callback(err, null, null);
 
+                    for (let c of callbackQueue) {
+                        c(err, null, null);
+                    }
+                }
             });
 
-            // Return cached data
+        // Return cached data
         } else {
-            PM25 = self.updateData(self.cache, 'Cache');
-            callback(null, self.transformPM25(PM25));
+            callback(null, self.cache, 'Cache');
         }
+    }
+
+    _shouldUpdate() {
+        let intervalBetweenUpdates = this.cacheExpiryTime * 60
+        return this.lastupdate === 0 ||
+                this.lastupdate + intervalBetweenUpdates < (new Date().getTime() / 1000) ||
+                this.cache === undefined
+    }
+}
+
+/**
+ * Smogomierz Accessory
+ */
+function SmogomierzSensor(log, config) {
+    this.log = log;
+    this.servicesNames = config['servicesNames'] || {}
+    this.smogomierzRepo = new SmogomierzRepository(log, config)
+
+    this.log.info("Smogomierz setuped");
+}
+
+SmogomierzSensor.prototype = {
+    getAirQuality: function(next) {
+        var self = this
+
+        self._getData(
+            airQualitySensorService,
+            DataType.AIRQUALITY,
+            next
+        )
     },
 
-    /**
-     * Update data
-     */
-    updateData: function (data, type) {
+    getPm2_5: function(next) {
+        var self = this
 
-        airService.setCharacteristic(Characteristic.StatusFault, 0);
-		
-        airService.setCharacteristic(Characteristic.PM2_5Density, data.pm25);
-        airService.setCharacteristic(Characteristic.PM10Density, data.pm10);
-
-         var PM25 = data.pm25;
-		
-        this.log.info("[%s] PM2.5: %s.", type, PM25.toString());
-
-        this.cache = data;
-
-        if (type === 'Fetch') {
-            this.lastupdate = new Date().getTime() / 1000;
-        }
-
-        return PM25;
+        self._getData(
+            airQualitySensorService,
+            DataType.PM2_5,
+            next
+        )
     },
 
-	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index 
-    transformPM25: function (PM25) {
-        if (!PM25) {
-            return (0); // Error or unknown response
-        } else if (PM25 <= 10) {
-            return (1); // Return EXCELLENT
-        } else if (PM25 > 10 && PM25 <= 20) {
-            return (2); // Return GOOD
-        } else if (PM25 > 20 && PM25 <= 25) {
-            return (3); // Return FAIR
-        } else if (PM25 > 25 && PM25 <= 50) {
-            return (4); // Return INFERIOR
-        } else if (PM25 > 50) {
-            return (5); // Return POOR (Homekit only goes to cat 5).
-        } else {
-            return (0); // Error or unknown response.
-        }
+    getPm10: function(next) {
+        var self = this
+
+        self._getData(
+            airQualitySensorService,
+            DataType.PM10,
+            next
+        )
+    },
+
+    getTemperature: function(next) {
+        var self = this
+
+        self._getData(
+            temperatureSensorService,
+            DataType.TEMPERATURE,
+            next
+        )
+    },
+
+    getHumidity: function(next) {
+        var self = this
+
+        self._getData(
+            humiditySensorService,
+            DataType.HUMIDITY,
+            next
+        )
     },
 
     identify: function (callback) {
@@ -131,19 +186,117 @@ AirAccessory.prototype = {
         services.push(informationService);
 
         /**
-         * AirService
+         * airQualitySensorService
          */
-        airService = new Service.AirQualitySensor(this.name);
+        let airQualityName = this.servicesNames['airQuality'] || "Air Quality"
+        airQualitySensorService = new Service.AirQualitySensor(airQualityName);
 
-        airService
+        airQualitySensorService
             .getCharacteristic(Characteristic.AirQuality)
-            .on('get', this.getAirData.bind(this));
+            .on('get', this.getAirQuality.bind(this));
 
-        airService.addCharacteristic(Characteristic.StatusFault);
-        airService.addCharacteristic(Characteristic.PM2_5Density);
-        airService.addCharacteristic(Characteristic.PM10Density);
-        services.push(airService);
+        airQualitySensorService
+            .getCharacteristic(Characteristic.PM2_5Density)
+            .on('get', this.getPm2_5.bind(this));
+
+        airQualitySensorService
+            .getCharacteristic(Characteristic.PM10Density)
+            .on('get', this.getPm10.bind(this));
+
+        services.push(airQualitySensorService);
+
+        /**
+         * temperatureSensorService
+         */
+        let temperatureName = this.servicesNames['temperature'] || "Temperature"
+        temperatureSensorService = new Service.TemperatureSensor(temperatureName)
+
+        temperatureSensorService
+            .getCharacteristic(Characteristic.CurrentTemperature)
+            .on('get', this.getTemperature.bind(this));
+
+        services.push(temperatureSensorService);
+
+        /**
+         * humiditySensorService
+         */
+        let humidityName = this.servicesNames['humidity'] || "Humidity"
+        humiditySensorService = new Service.HumiditySensor(humidityName)
+
+        humiditySensorService
+            .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+            .on('get', this.getHumidity.bind(this));
+
+        services.push(humiditySensorService);
 
         return services;
+    },
+
+    // PRIAVTE
+    _getData: function(service, type, next) {
+        var self = this
+
+        self.smogomierzRepo.getData(function (error, data, source) {
+            if (error) {
+                service.setCharacteristic(Characteristic.StatusFault, 1);
+                self.log(error.message);
+                return next(error, null);
+            }
+
+            service.setCharacteristic(Characteristic.StatusFault, 0);
+
+            let typeName = null
+            let value = null
+
+            switch (type) {
+                case DataType.AIRQUALITY:
+                    typeName = "AirQuality"
+                    value = self._transformPM25ToAirQuality(data.pm25)
+                    break;
+                case DataType.PM2_5:
+                    typeName = "PM2.5"
+                    value = data.pm25
+                    break;
+                case DataType.PM10:
+                    typeName = "PM10"
+                    value = data.pm10
+                    break;
+                case DataType.TEMPERATURE:
+                    typeName = "Temperature"
+                    value = data.temperature
+                    break;
+                case DataType.HUMIDITY:
+                    typeName = "Humidity"
+                    value = data.humidity
+                    break;
+                default:
+                    let error = new Error("Unknown data type: " + type)
+                    self.log(error.message);
+                    return next(error, null);
+            }
+
+            self.log.info("Update %s: %s from [%s].", typeName, value.toString(), source);
+
+            return next(null, value);
+          })
+    },
+
+	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index
+    _transformPM25ToAirQuality: function (PM25) {
+        if (!PM25) {
+            return (0); // Error or unknown response
+        } else if (PM25 <= 10) {
+            return (1); // Return EXCELLENT
+        } else if (PM25 > 10 && PM25 <= 20) {
+            return (2); // Return GOOD
+        } else if (PM25 > 20 && PM25 <= 25) {
+            return (3); // Return FAIR
+        } else if (PM25 > 25 && PM25 <= 50) {
+            return (4); // Return INFERIOR
+        } else if (PM25 > 50) {
+            return (5); // Return POOR (Homekit only goes to cat 5).
+        } else {
+            return (0); // Error or unknown response.
+        }
     }
 };
