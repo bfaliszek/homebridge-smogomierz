@@ -213,6 +213,10 @@ SmogomierzSensor.prototype = {
 
         temperatureSensorService
             .getCharacteristic(Characteristic.CurrentTemperature)
+            .setProps({
+                minValue: -100,
+                maxValue: 100
+            })
             .on('get', this.getTemperature.bind(this));
 
         services.push(temperatureSensorService);
@@ -283,7 +287,7 @@ SmogomierzSensor.prototype = {
 
 	// Based on Index level for PM2.5 http://www.eea.europa.eu/themes/air/air-quality-index
     _transformPM25ToAirQuality: function (PM25) {
-        if (!PM25) {
+        if (isNaN(PM25) || PM25 === null || PM25 === "" || PM25 === undefined ) {
             return (0); // Error or unknown response
         } else if (PM25 <= 10) {
             return (1); // Return EXCELLENT
